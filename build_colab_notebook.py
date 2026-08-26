@@ -251,8 +251,8 @@ Check for misplaced boxes, missing objects and inconsistent classes.
     ),
     code(
         r"""
-rng = np.random.default_rng(2004)
-sample_paths = rng.choice(split_images["train"], size=6, replace=False)
+rng = np.random.default_rng()
+sample_paths = rng.choice(split_images["train"], size=6, replace=False)  # rerun for a fresh six
 
 fig, axes = plt.subplots(2, 3, figsize=(16, 9))
 colors = {0: "gold", 1: "darkorange", 2: "deepskyblue"}
