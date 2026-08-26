@@ -1,28 +1,30 @@
-# Instructor setup for the drone-observation Colab
+# Instructor setup for the drone observation Colab
 
-The student notebook is `drone_observation_yolo_colab.ipynb`. It assumes no
-deep-learning background and is designed for live narration.
+The student notebook is `drone_observation_yolo_colab.ipynb`. It is generated
+by `build_colab_notebook.py`. Edit the builder and regenerate; do not edit the
+notebook JSON.
 
-## Course assets
+## Course files
 
-Host these four files at one public web location (the class S3 bucket) so that
-`<base URL>/<file name>` resolves for each. The notebook's link field is
-pre-filled with the current base URL; when the bucket changes, update
-`COURSE_DATA_URL` in `build_colab_notebook.py` and regenerate. Make the bucket
-or prefix public for the lab day and delete it afterwards.
+Host these four files at one public web location so that
+`<base URL>/<file name>` resolves for each. The notebook link field is
+pre-filled with the current bucket URL. When the bucket changes, update
+`COURSE_DATA_URL` in the builder and regenerate. The bucket is public for the
+lab day only; delete it afterwards.
 
 | File | Approximate size | Purpose |
 |---|---:|---|
 | `droneobs-demo.zip` | 523 MB | 1,500 train, 300 validation, and 300 test images |
-| `reference_model.pt` | 5.3 MB | fallback model, so later sections work without training |
-| `strong_vehicle_model.pt` | 54.4 MB | multi-source YOLO11s comparison and batch-video model |
-| `DJI_0022_teaching_clip.mp4` | 8 MB | 30-second, 1280×720 stable-camera practical clip |
+| `reference_model.pt` | 5.3 MB | backup model if a student's training run fails |
+| `strong_vehicle_model.pt` | 54.4 MB | larger comparison and video model |
+| `DJI_0022_teaching_clip.mp4` | 8 MB | 30-second, 1280×720 stable-camera clip |
 
-Student outputs are saved to `MyDrive/GIST2004-8004/my-droneobs-results` in
-each student's own Drive.
+Student outputs save to `MyDrive/GIST2004-8004/my-droneobs-results` in each
+student's Drive.
 
-The archive contains 2,100 VisDrone images and 73,869 labelled objects. The
-class distribution is strongly imbalanced:
+## Dataset
+
+The archive contains 2,100 VisDrone images and 73,869 labelled boxes:
 
 | Class | Boxes |
 |---|---:|
@@ -30,80 +32,100 @@ class distribution is strongly imbalanced:
 | motorcycle | 9,424 |
 | vehicle | 61,386 |
 
-There are 38 valid empty-label images. They are background examples, not
-missing annotations.
+38 images have valid empty label files. These are background examples.
 
-The supplied reference is YOLO11n trained for 50 epochs at 1024 px. Its saved
-validation metrics are mAP50 0.449 and mAP50–95 0.245. It is the fallback when
-a student cannot finish training. New runs start from `yolo26n.pt`.
+Before sharing the archive more widely, check the intended arrangement
+against the VisDrone terms and keep the provenance note.
 
-The stronger comparison is YOLO11s trained at 960 px on the old multi-source
-pipeline. Its saved held-out metrics are mAP50 0.852 and mAP50–95 0.535. Its
-test set and two-class `vehicle`/`person` scheme differ from the pilot, so the
-metric comparison is illustrative rather than a controlled benchmark. The
-notebook uses only its `vehicle` output. The 327 MB YOLO11x accuracy-reference
-checkpoint remains an instructor artefact rather than a required Colab asset.
+## Models
+
+The notebook uses plain names: the student's run is `my model`,
+`reference_model.pt` is `backup model`, and `strong_vehicle_model.pt` is
+`bigger model`. Every dropdown defaults to `my model`.
+
+The backup is YOLO11n, 50 epochs at 1024 px on this dataset: mAP50 0.449,
+mAP50–95 0.245 on the pilot test set. Student runs start from `yolo26n.pt`.
+
+The bigger model is YOLO11s at 960 px from the old multi-source pipeline:
+mAP50 0.852 on its own test set, which used a two-class vehicle/person
+scheme. The two mAP figures come from different test sets and label schemes,
+so they are not comparable. The notebook uses only its `vehicle` class. The
+327 MB YOLO11x checkpoint stays local.
+
+## Training settings
+
+`epochs` 20, `imgsz` 960, `batch` 12. Batch 8 peaked at about 7 GB on the
+Colab T4. A local run of the notebook at batch 16 peaked at 13.7 GB reserved,
+too close to the T4's 15 GB for class use, so 12 ships. If a run still hits
+an out-of-memory error, drop back to 8.
+
+Training runs on `/content` and copies `best.pt` and the plots to Drive when
+it finishes. Do not train against files mounted from Drive. Colab's free GPU
+type and availability vary, so do not promise a completion time.
 
 ## Distribution
 
-Keep the notebook in the standalone public
-`flinders-geospatial/GIST2004-8004-DroneObs-DL` GitHub repository and link to
-its GitHub URL with a standard **Open in Colab** badge. The four larger assets
-live in S3, not the repository. The notebook builds each file's URL from the
-single public base URL. Do not put AWS credentials in the notebook.
+The notebook lives in the public
+`flinders-geospatial/GIST2004-8004-DroneObs-DL` repository with an
+**Open in Colab** badge in the README. The four large files stay in S3, out
+of the repository. No AWS credentials appear anywhere in the notebook.
 
-## Recommended class sequence
+## Class sequence
 
-1. Run setup and the fetch cell, watch the embedded teaching clip, then run
-   extraction, the dataset audit, and the label visualisation.
-2. Show the stock pretrained model's detections on the video frame, then
-   explain transfer learning and the training settings.
-3. Set `TRAIN_MODEL = True` and train on the available GPU.
-4. Continue with the reference model if a student's runtime is interrupted.
-5. Compare the pilot and stronger model on the same DJI frame.
-6. Draw a line in PolygonZone and run the tracking/counting cells.
+1. Run setup and the fetch cell, watch the embedded clip, then run
+   extraction, the dataset audit, and the label examples.
+2. Run the stock pretrained model on the default test photo; students can
+   paste any image address and rerun. Then cover transfer learning and the
+   training settings.
+3. Tick `TRAIN_MODEL` and train.
+4. If a runtime is interrupted, the note at the top of section 5 covers the
+   switch to the backup model.
+5. Compare the student's model and the bigger model, stacked on the same
+   frame with a parameter table.
+6. Draw one or more lines in PolygonZone, paste its NumPy output over
+   `LINES`, and run the tracking and counting cells. The CSV has a `line`
+   column.
 7. Download the annotated video and compare the CSV with a manual count.
 
-For footage the students capture next week, upload it to object storage and
-paste its URL into `NEW_VIDEO_URL`, or put it in Drive and select `file in
-Drive`. Re-run the video cell before choosing the counting line.
-`MAX_SECONDS = 0` processes the complete video; retain a short limit while
-rehearsing the workflow.
+Line counts assume a stationary or stabilised camera. A pan or translation
+makes a road-fixed line invalid; the notebook says so.
 
-The notebook trains from `/content`, then copies the model and plots to
-Drive. Avoid training directly against thousands of files in mounted Drive.
-Colab's free GPU type, limits, and availability are dynamic, so do not promise
-a particular completion time.
+## Next week's footage
+
+Upload the 3 or 4 class clips to public object storage, same pattern as the
+course bucket, and give out the links. Students choose `video web link` and
+paste one into `NEW_VIDEO_URL`, then re-run the video cell before choosing
+lines. `MAX_SECONDS = 0` processes the whole video; keep a short limit while
+rehearsing.
 
 ## PolygonZone
 
-PolygonZone is only a coordinate picker for the counting line; it does not
-label training data. If a later iteration adds labelling of new frames, split
-video-derived data by whole clip or time block: randomly placing nearly
-identical adjacent frames into both train and test produces misleadingly good
-validation results.
+PolygonZone picks the counting-line coordinates. It does not label training
+data. If a later version adds labelling of new frames, split video-derived
+data by whole clip or time block: near-identical adjacent frames in both
+train and test give inflated validation results.
 
 ## Rehearsal checklist
 
-- Test that the public base URL resolves for all four file names.
-- Confirm the teaching clip embeds and plays after the fetch cell.
-- Confirm the dataset audit reports 1,500/300/300 images.
-- Visually inspect the six random label examples.
-- Confirm the stock pretrained model cell renders detections on the video frame.
-- For setup testing, set `epochs` to 1 in the training-settings cell.
-- Confirm `best.pt`, `results.csv`, and plots are copied to Drive.
-- Run still-image inference using both reference and newly trained weights.
-- Confirm the pilot/stronger-model comparison renders on the same DJI frame.
-- Download `zone_reference.jpg`, confirm PolygonZone reports coordinates for a
-  1280×720 image, and preview the pasted line.
-- Confirm the annotated MP4 plays inline and the model-named crossing CSV is
-  copied to Drive and can be downloaded.
-- Reverse the line endpoints if the displayed in/out convention is unhelpful.
+- The public base URL resolves for all four file names.
+- The teaching clip embeds and plays after the fetch cell.
+- The dataset audit reports 1,500/300/300 images.
+- The six random label examples look right.
+- The stock model cell renders detections on the default photo; paste a
+  different image address to check the field.
+- Set `epochs` to 1 for setup testing and watch the first epoch's VRAM at
+  batch 12.
+- `best.pt`, `results.csv`, and the plots copy to Drive.
+- Still-image inference runs with both `my model` and `backup model`.
+- The stacked comparison and its parameter table render.
+- `zone_reference.jpg` downloads, PolygonZone's NumPy output pastes over
+  `LINES`, and the numbered lines preview.
+- The annotated MP4 plays inline and the crossing CSV, with its `line`
+  column, copies to Drive.
+- Reverse a line's endpoints if its in/out convention is unhelpful.
 
-Line counts assume a stationary or stabilised camera. A drone pan or translation
-makes a road-fixed interpretation invalid; that limitation is intentionally
-called out in the student notebook.
+## Version note
 
-Before distributing the pilot archive, retain its VisDrone provenance and
-confirm that the intended sharing arrangement is consistent with the source
-dataset's terms.
+`supervision` 0.27 `LineZone.trigger` calls `np.cross` on 2-D vectors, which
+NumPy 2 removed. Colab ships NumPy 1.x today, so it works. If Colab moves to
+NumPy 2, bump `supervision` and re-test the counting loop.

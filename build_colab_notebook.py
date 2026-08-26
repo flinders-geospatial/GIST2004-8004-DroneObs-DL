@@ -49,6 +49,9 @@ The footage is low-altitude oblique drone video: the drone hovers at roughly 50 
 
 1. Open this notebook in Google Colab and choose **File → Save a copy in Drive**.
 2. Choose **Runtime → Change runtime type → GPU**. A T4 is sufficient when one is available.
+3. Run the cells in order from the top: click a cell and press **Shift+Enter**, or click the play button at its left. A cell has finished when the spinner at its left becomes a number.
+
+Some cells show a settings panel beside the code, with tick boxes and text fields. These are Colab form fields: they set values in that cell without you editing the code. After changing one, run the cell again.
 
 Colab runtimes reset without warning. The notebook saves training and video outputs to your Drive.
 """
@@ -134,12 +137,12 @@ OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 ASSET_FOLDER = Path("/content/droneobs_course_assets")
 ASSET_FOLDER.mkdir(parents=True, exist_ok=True)
 DATASET_ZIP = ASSET_FOLDER / "droneobs-demo.zip"
-REFERENCE_MODEL = ASSET_FOLDER / "reference_model.pt"
-STRONG_MODEL = ASSET_FOLDER / "strong_vehicle_model.pt"
+BACKUP_MODEL = ASSET_FOLDER / "reference_model.pt"
+BIGGER_MODEL = ASSET_FOLDER / "strong_vehicle_model.pt"
 VIDEO_SOURCE = ASSET_FOLDER / "DJI_0022_teaching_clip.mp4"
 
 assert COURSE_DATA_URL.startswith("http"), "Paste the course link first, then rerun this cell."
-for destination in (DATASET_ZIP, REFERENCE_MODEL, STRONG_MODEL, VIDEO_SOURCE):
+for destination in (DATASET_ZIP, BACKUP_MODEL, BIGGER_MODEL, VIDEO_SOURCE):
     if not destination.exists():
         print("Downloading", destination.name, "...")
         # Download under a temporary name so an interrupted download is retried.
@@ -147,7 +150,7 @@ for destination in (DATASET_ZIP, REFERENCE_MODEL, STRONG_MODEL, VIDEO_SOURCE):
         urlretrieve(f"{COURSE_DATA_URL.rstrip('/')}/{destination.name}", partial)
         partial.rename(destination)
 
-for path in (DATASET_ZIP, REFERENCE_MODEL, STRONG_MODEL, VIDEO_SOURCE):
+for path in (DATASET_ZIP, BACKUP_MODEL, BIGGER_MODEL, VIDEO_SOURCE):
     print(f"{path.stat().st_size / 1024**2:8.1f} MB  {path.name}")
 print("Outputs will be saved to", OUTPUT_FOLDER)
 """
@@ -284,21 +287,19 @@ plt.show()
 
 Training a detector from nothing needs millions of labelled images. Instead we start from `yolo26n.pt`, a small pretrained model from [Ultralytics](https://docs.ultralytics.com/models/). It has already been trained on COCO, a large collection of everyday photos covering 80 common object types, so it already knows a great deal about edges, textures, vehicles and people. Adjusting a pretrained model with a much smaller set of our own examples is called transfer learning.
 
-First, see what the pretrained model detects on a frame of our drone video, before it has seen a single drone image.
+First, try it exactly as downloaded. The address below points to a classic photo used to test detectors. Run the cell, then paste any other image address from the web into the field and run it again.
 """
     ),
     code(
         r"""
 stock_model = YOLO("yolo26n.pt")  # downloads the pretrained COCO weights once
 
-cap = cv2.VideoCapture(str(VIDEO_SOURCE))
-ok, demo_frame = cap.read()
-cap.release()
+IMAGE_URL = "https://ultralytics.com/images/bus.jpg"  # @param {type:"string"}
 
-stock_result = stock_model.predict(demo_frame, imgsz=960, conf=0.25, device=DEVICE, verbose=False)[0]
+stock_result = stock_model.predict(IMAGE_URL, imgsz=960, conf=0.25, device=DEVICE, verbose=False)[0]
 
-plt.figure(figsize=(14, 8))
-plt.imshow(cv2.cvtColor(stock_result.plot(line_width=1), cv2.COLOR_BGR2RGB))
+plt.figure(figsize=(10, 10))
+plt.imshow(cv2.cvtColor(stock_result.plot(line_width=2), cv2.COLOR_BGR2RGB))
 plt.title(f"Pretrained COCO model, no fine-tuning: {len(stock_result.boxes)} detections")
 plt.axis("off")
 plt.show()
@@ -309,7 +310,7 @@ print("Detected:", dict(detected_classes))
     ),
     md(
         r"""
-The pretrained model already finds vehicles and people, because cars, buses, trucks and people are COCO classes. But COCO photos are mostly taken at ground level, so from the drone's oblique viewpoint it misses small and distant objects, and its 80 classes do not match our three. Fine-tuning keeps what the model knows about images in general and adjusts it with our labelled drone examples.
+On everyday photos the pretrained model already performs well, because COCO covers scenes like this. Our task is different: small objects seen obliquely from 50 to 60 m, and three classes (`bicycle`, `motorcycle`, `vehicle`) that COCO does not use. Fine-tuning keeps what the model knows about images in general and adjusts it to our labels and viewpoint.
 
 ### Training settings
 
@@ -317,9 +318,9 @@ The pretrained model already finds vehicles and people, because cars, buses, tru
 |---|---|
 | `epochs` | Passes through the training images |
 | `imgsz` | Working image size; larger costs more time and memory |
-| `batch` | Images processed together |
+| `batch` | Images processed together; 12 is sized for the free T4 GPU |
 
-The supplied reference model is YOLO11n, an earlier release in the same model family, trained on this dataset in advance. If your training run is interrupted, continue with the reference model.
+The tick box beside the next cell is a form field that stops a stray **Run all** from starting a long training run: training only runs while it is ticked. During training the run keeps its best weights up to date after every epoch and copies them, with the diagnostics, to your Drive when it finishes. If your run is interrupted, a backup model trained in advance is supplied; the next section shows how to switch to it.
 """
     ),
     code(
@@ -327,10 +328,10 @@ The supplied reference model is YOLO11n, an earlier release in the same model fa
 TRAIN_MODEL = False  # @param {type:"boolean"}
 BASE_MODEL = "yolo26n.pt"
 
-TRAIN_SETTINGS = {"epochs": 20, "imgsz": 960, "batch": 8}
+TRAIN_SETTINGS = {"epochs": 20, "imgsz": 960, "batch": 12}
 RUN_NAME = "droneobs_yolo26n"
 RUNS_ROOT = WORK_ROOT / "runs"
-TRAINED_WEIGHTS = RUNS_ROOT / RUN_NAME / "weights" / "best.pt"
+MY_MODEL = RUNS_ROOT / RUN_NAME / "weights" / "best.pt"
 
 print(TRAIN_SETTINGS)
 print("Training enabled:", TRAIN_MODEL)
@@ -355,12 +356,12 @@ if TRAIN_MODEL:
         plots=True,
         **TRAIN_SETTINGS,
     )
-    TRAINED_WEIGHTS = Path(train_result.save_dir) / "weights" / "best.pt"
+    MY_MODEL = Path(train_result.save_dir) / "weights" / "best.pt"
 
     saved_run = OUTPUT_FOLDER / RUN_NAME
     saved_run.mkdir(parents=True, exist_ok=True)
     useful_files = [
-        TRAINED_WEIGHTS,
+        MY_MODEL,
         Path(train_result.save_dir) / "weights" / "last.pt",
         Path(train_result.save_dir) / "results.csv",
         Path(train_result.save_dir) / "results.png",
@@ -372,7 +373,7 @@ if TRAIN_MODEL:
             shutil.copy2(source, saved_run / source.name)
     print("Saved model and diagnostics to", saved_run)
 else:
-    print("Training skipped. The remaining sections can use the supplied reference model.")
+    print("Training skipped. The remaining sections can use the supplied backup model.")
 """
     ),
     md(
@@ -384,26 +385,36 @@ The loss curves should fall and the mAP curves should rise as training progresse
     ),
     code(
         r"""
-results_plot = TRAINED_WEIGHTS.parents[1] / "results.png"
+results_plot = MY_MODEL.parents[1] / "results.png"
 if results_plot.exists():
     display(NotebookImage(filename=str(results_plot)))
 else:
-    print("No new training plot yet. Run the training cell, or continue with the reference model.")
+    print("No new training plot yet. Run the training cell, or continue with the backup model.")
 """
     ),
     md(
         r"""
 ## 5. Try the detector on one held-out image
 
+Three models appear from here on. The dropdown menus let you switch between them.
+
+| Choice | What it is |
+|---|---|
+| `my model` | The YOLO26n you fine-tuned above |
+| `backup model` | A small model like yours, trained on the same dataset in advance |
+| `bigger model` | A larger model trained in advance on far more drone footage; it appears in the video section |
+
+If your training run went wrong, or ran out of time, untick `TRAIN_MODEL` in the training cell, choose `backup model` below, and carry on. Nothing below depends on your own run finishing.
+
 The test images were never used during training, so they are a fair check of what the model learned. Every detection carries a confidence score. Confidence is a filter score, not a true probability: a lower threshold gives more detections and more false detections. Try changing `conf` in the prediction cell to 0.15 and then 0.45 and compare what appears and disappears.
 """
     ),
     code(
         r"""
-WEIGHTS_CHOICE = "reference"  # @param ["reference", "trained"]
+WEIGHTS_CHOICE = "my model"  # @param ["my model", "backup model"]
 
-weights_path = TRAINED_WEIGHTS if WEIGHTS_CHOICE == "trained" else REFERENCE_MODEL
-assert weights_path.exists(), f"{weights_path} not found. Train first, or choose 'reference'."
+weights_path = MY_MODEL if WEIGHTS_CHOICE == "my model" else BACKUP_MODEL
+assert weights_path.exists(), "Weights not found. If training did not finish, choose 'backup model'."
 inference_model = YOLO(str(weights_path))
 MODEL_CLASS_NAMES = {int(k): v for k, v in inference_model.names.items()}
 print("Using:", weights_path)
@@ -412,7 +423,7 @@ print("Classes:", MODEL_CLASS_NAMES)
     ),
     code(
         r"""
-test_image = split_images["test"][17]
+test_image = rng.choice(split_images["test"])  # rerun for a different image
 prediction = inference_model.predict(
     source=str(test_image), imgsz=960, conf=0.25, device=DEVICE, verbose=False
 )[0]
@@ -434,24 +445,20 @@ VisDrone and the field footage differ in location, flight height, camera angle, 
         r"""
 ## 6. Prepare the video and a counting line
 
-Today you rehearse the full workflow on the supplied clip. Next week you will fly the drone, capture your own footage, and re-run this same workflow on it by pasting a link or a Drive path below.
+Today you rehearse the full workflow on the supplied clip. Next week you will fly the drone; the class footage will be published as a few short clips at course web links. Choose `video web link`, paste a link, and the same workflow runs on it.
 
 A fixed counting line is only valid while the camera holds still. If the drone pans or drifts, the road moves underneath the line and creates false crossings. Longer moving-camera work needs stabilisation or georeferencing.
 """
     ),
     code(
         r"""
-VIDEO_SOURCE_MODE = "supplied clip"  # @param ["supplied clip", "temporary URL", "file in Drive"]
+VIDEO_SOURCE_MODE = "supplied clip"  # @param ["supplied clip", "video web link"]
 NEW_VIDEO_URL = ""  # @param {type:"string"}
-NEW_VIDEO_DRIVE_PATH = "/content/drive/MyDrive/GIST2004-8004/new_drone_video.mp4"  # @param {type:"string"}
 
-if VIDEO_SOURCE_MODE == "temporary URL":
+if VIDEO_SOURCE_MODE == "video web link":
     LOCAL_VIDEO = WORK_ROOT / (Path(urlparse(NEW_VIDEO_URL).path).name or "new_drone_video.mp4")
     print("Downloading the video ...")
     urlretrieve(NEW_VIDEO_URL, LOCAL_VIDEO)
-elif VIDEO_SOURCE_MODE == "file in Drive":
-    LOCAL_VIDEO = WORK_ROOT / Path(NEW_VIDEO_DRIVE_PATH).name
-    shutil.copy2(NEW_VIDEO_DRIVE_PATH, LOCAL_VIDEO)
 else:
     LOCAL_VIDEO = WORK_ROOT / VIDEO_SOURCE.name
     if not LOCAL_VIDEO.exists():
@@ -476,19 +483,19 @@ print(
         r"""
 ### Choose the detector for the video
 
-The video runs through the stronger supplied model by default. The pilot dataset is small, so the model you just trained misses too many vehicles for the tracker to follow them reliably. The stronger model was trained on far more data and holds onto each vehicle from frame to frame; only its `vehicle` detections are used. Switch to `trained` later if you want to see the difference.
+Start with your own model. The pilot dataset is small, so expect missed vehicles and dropped tracks. Then come back, choose `bigger model`, and rerun the cells from here: it was trained on far more footage and holds each vehicle from frame to frame.
 """
     ),
     code(
         r"""
-VIDEO_MODEL_CHOICE = "strong"  # @param ["strong", "reference", "trained"]
+VIDEO_MODEL_CHOICE = "my model"  # @param ["my model", "backup model", "bigger model"]
 
 video_weights = {
-    "strong": STRONG_MODEL,
-    "reference": REFERENCE_MODEL,
-    "trained": TRAINED_WEIGHTS,
+    "my model": MY_MODEL,
+    "backup model": BACKUP_MODEL,
+    "bigger model": BIGGER_MODEL,
 }[VIDEO_MODEL_CHOICE]
-assert video_weights.exists(), f"{video_weights} not found. Train first, or choose 'strong'."
+assert video_weights.exists(), "Weights not found. If training did not finish, choose 'backup model' or 'bigger model'."
 inference_model = YOLO(str(video_weights))
 MODEL_CLASS_NAMES = {int(k): v for k, v in inference_model.names.items()}
 print("Video model:", video_weights.name)
@@ -497,7 +504,7 @@ print("Classes:", MODEL_CLASS_NAMES)
     ),
     code(
         r"""
-PROCESS_WIDTH = 1280  # @param {type:"integer"}
+PROCESS_WIDTH = 1280  # every processed frame is resized to this width
 
 def resize_to_width(frame, target_width):
     height, width = frame.shape[:2]
@@ -517,18 +524,16 @@ zone_frame = resize_to_width(first_frame, PROCESS_WIDTH)
 ZONE_HEIGHT, ZONE_WIDTH = zone_frame.shape[:2]
 ZONE_IMAGE = WORK_ROOT / "zone_reference.jpg"
 cv2.imwrite(str(ZONE_IMAGE), zone_frame)
-
-print(f"Use coordinates from this exact {ZONE_WIDTH}×{ZONE_HEIGHT} image.")
-display(NotebookImage(filename=str(ZONE_IMAGE), width=960))
+print(f"Reference frame saved: {ZONE_WIDTH}×{ZONE_HEIGHT}")
 """
     ),
     md(
         r"""
-### A small model and a stronger model on the same frame
+### Your model and the bigger model on the same frame
 
-Model scale and training data both change, so this is not a controlled comparison. Check missed objects, false detections, box placement and confidence.
+The two results are stacked above each other so you can scan the same region in both. Model size and training data both change, so this is not a controlled comparison. Check missed objects, false detections, box placement and confidence.
 
-mAP50 in the table below scores how often the model's boxes match the human labels with at least 50% overlap: 0 is no matches and 1.0 is perfect.
+For reference, mAP50 scores how often a model's boxes match the human labels with at least 50% overlap (0 is no matches, 1.0 is perfect). The backup model scored mAP50 0.449 on the pilot test set. The bigger model scored 0.852, but on its own test set with different labels, so the two numbers are not a head-to-head score.
 """
     ),
     code(
@@ -536,80 +541,82 @@ mAP50 in the table below scores how often the model's boxes match the human labe
 RUN_MODEL_COMPARISON = True  # @param {type:"boolean"}
 
 if RUN_MODEL_COMPARISON:
+    small_model_path = MY_MODEL if MY_MODEL.exists() else BACKUP_MODEL
     comparison_specs = [
-        ("Pilot YOLO11n", REFERENCE_MODEL, None),
-        ("Multi-source YOLO11s (vehicle only)", STRONG_MODEL, [0]),
+        ("my model" if small_model_path == MY_MODEL else "backup model", small_model_path, None),
+        ("bigger model (vehicle only)", BIGGER_MODEL, [0]),
     ]
-    comparison_images = []
-    comparison_counts = []
-    for title, model_path, class_filter in comparison_specs:
+    comparison_rows = []
+    fig, axes = plt.subplots(2, 1, figsize=(14, 16))
+    for axis, (title, model_path, class_filter) in zip(axes, comparison_specs):
         model = YOLO(str(model_path))
         result = model.predict(
             zone_frame, imgsz=960, conf=0.25, classes=class_filter,
             device=DEVICE, verbose=False,
         )[0]
-        comparison_images.append(cv2.cvtColor(result.plot(line_width=1), cv2.COLOR_BGR2RGB))
-        comparison_counts.append(len(result.boxes))
-
-    fig, axes = plt.subplots(1, 2, figsize=(18, 7))
-    for axis, (title, _, _), image, count in zip(
-        axes, comparison_specs, comparison_images, comparison_counts
-    ):
-        axis.imshow(image)
-        axis.set_title(f"{title}: {count} detections")
+        axis.imshow(cv2.cvtColor(result.plot(line_width=1), cv2.COLOR_BGR2RGB))
+        axis.set_title(f"{title}: {len(result.boxes)} detections")
         axis.axis("off")
+        comparison_rows.append(
+            {
+                "model": title,
+                "parameters (millions)": round(sum(p.numel() for p in model.model.parameters()) / 1e6, 1),
+                "file size (MB)": round(model_path.stat().st_size / 1024**2, 1),
+                "detections on this frame": len(result.boxes),
+            }
+        )
     plt.tight_layout()
     plt.show()
-
-    scale_comparison = pd.DataFrame(
-        [
-            ["pilot YOLO11n", "5.3 MB", "2,100 VisDrone images", "0.449"],
-            ["multi-source YOLO11s", "54.4 MB", "vehicle backbone: 93,886 train images", "0.852"],
-        ],
-        columns=["model", "checkpoint", "training-data scale", "saved test mAP50*"],
-    )
-    display(scale_comparison)
-    print("*Metrics came from different test sets and label schemes; do not treat them as a head-to-head score.")
+    display(pd.DataFrame(comparison_rows).set_index("model"))
 else:
     print("Comparison skipped.")
 """
     ),
     md(
         r"""
-### Draw the line with Roboflow PolygonZone
+### Draw the counting lines with Roboflow PolygonZone
 
-PolygonZone selects line coordinates; it does not label training data.
+PolygonZone picks coordinates on an image; it does not label training data.
 
-1. Run `files.download(str(ZONE_IMAGE))` in the next cell.
+1. Run the next cell. It downloads `zone_reference.jpg` and shows the same image for reference.
 2. Open [Roboflow PolygonZone](https://polygonzone.roboflow.com/).
-3. Upload `zone_reference.jpg`.
-4. Draw one line across the road, perpendicular to the traffic flow you want to count.
-5. Copy the two endpoint coordinates into `LINE_START` and `LINE_END` below.
+3. Upload `zone_reference.jpg` and choose the line tool.
+4. Draw one or more lines across the roads you want to count, each roughly perpendicular to the traffic flow.
+5. Copy the NumPy-format coordinates from the panel beside the image and paste them over the example in the `LINES` cell, keeping the `LINES =` part.
 
-The line has a direction. If `in` and `out` appear reversed, swap its two endpoints.
+Each line has a direction. If a line's `in` and `out` come out reversed, swap its two endpoints.
 """
     ),
     code(
         r"""
+print(f"Draw on this exact {ZONE_WIDTH}×{ZONE_HEIGHT} image.")
 files.download(str(ZONE_IMAGE))
+display(NotebookImage(filename=str(ZONE_IMAGE), width=960))
 """
     ),
     code(
         r"""
-# Example for the supplied 1280×720 clip. Replace with your PolygonZone values.
-LINE_START = [610, 235]  # @param
-LINE_END = [610, 420]  # @param
+# Replace the example with the NumPy-format lines copied from PolygonZone.
+LINES = [
+    np.array([[610, 235], [610, 420]]),
+]
 
 preview = zone_frame.copy()
-start = tuple(map(int, LINE_START))
-end = tuple(map(int, LINE_END))
-assert all(0 <= x < ZONE_WIDTH for x in (start[0], end[0]))
-assert all(0 <= y < ZONE_HEIGHT for y in (start[1], end[1]))
-cv2.arrowedLine(preview, start, end, (0, 0, 255), 4, tipLength=0.06)
+for line_number, line in enumerate(LINES, start=1):
+    (x1, y1), (x2, y2) = np.asarray(line, dtype=int).tolist()
+    for x, y in ((x1, y1), (x2, y2)):
+        assert 0 <= x < ZONE_WIDTH and 0 <= y < ZONE_HEIGHT, (
+            f"Line {line_number} point ({x}, {y}) is outside the {ZONE_WIDTH}×{ZONE_HEIGHT} image."
+        )
+    cv2.arrowedLine(preview, (x1, y1), (x2, y2), (0, 0, 255), 4, tipLength=0.06)
+    cv2.putText(
+        preview, str(line_number), (x1 + 10, y1 - 10),
+        cv2.FONT_HERSHEY_SIMPLEX, 1.1, (0, 0, 255), 3,
+    )
 
 plt.figure(figsize=(14, 8))
 plt.imshow(cv2.cvtColor(preview, cv2.COLOR_BGR2RGB))
-plt.title("Counting line (arrow shows its direction)")
+plt.title("Counting lines (each arrow points from start to end)")
 plt.axis("off")
 plt.show()
 """
@@ -618,16 +625,18 @@ plt.show()
         r"""
 ## 7. Detect, track and count
 
-Three things happen to every frame. The detector finds the vehicles. The tracker (ByteTrack) matches each detection to the previous frames, so a moving vehicle keeps the same ID. When a tracked vehicle's bottom centre moves across your line, that ID is counted once, in whichever direction it crossed. The cells below save an annotated video and a CSV with one row per crossing.
+Three things happen to every frame. The detector finds the vehicles. The tracker (ByteTrack) matches each detection to the previous frames, so a moving vehicle keeps the same ID. When a tracked vehicle's bottom centre moves across one of your lines, that ID is counted once for that line, in whichever direction it crossed. The cells below save an annotated video and a CSV with one row per crossing.
 """
     ),
     code(
         r"""
-VIDEO_IMGSZ = 960  # @param {type:"integer"}
 CONFIDENCE = 0.25  # @param {type:"number"}
+# MAX_SECONDS = 0 processes the whole video. Keep it short while rehearsing.
 MAX_SECONDS = 30  # @param {type:"integer"}
+# 1 processes every frame; a larger stride skips frames to speed up long videos.
 FRAME_STRIDE = 1  # @param {type:"integer"}
 COUNT_CLASSES = "vehicle only"  # @param ["vehicle only", "all model classes"]
+VIDEO_IMGSZ = 960  # model input size, the same as training
 
 if COUNT_CLASSES == "vehicle only":
     KEEP_CLASS_IDS = [
@@ -642,7 +651,6 @@ OUTPUT_AVI = WORK_ROOT / f"{output_stem}_raw.avi"
 OUTPUT_MP4 = WORK_ROOT / f"{output_stem}.mp4"
 EVENTS_CSV = WORK_ROOT / f"{output_stem}_crossings.csv"
 
-# MAX_SECONDS = 0 processes the complete video.
 max_raw_frames = SOURCE_FRAMES if MAX_SECONDS == 0 else min(
     SOURCE_FRAMES, round(MAX_SECONDS * SOURCE_FPS)
 )
@@ -656,11 +664,14 @@ assert torch.cuda.is_available(), "Connect a GPU runtime for the video section."
 # The tracker, line counter and trace annotator keep state between frames,
 # so this cell always starts them fresh.
 tracker = sv.ByteTrack(frame_rate=max(1, round(SOURCE_FPS / FRAME_STRIDE)))
-line_zone = sv.LineZone(
-    start=sv.Point(*map(int, LINE_START)),
-    end=sv.Point(*map(int, LINE_END)),
-    triggering_anchors=(sv.Position.BOTTOM_CENTER,),
-)
+line_zones = [
+    sv.LineZone(
+        start=sv.Point(int(line[0][0]), int(line[0][1])),
+        end=sv.Point(int(line[1][0]), int(line[1][1])),
+        triggering_anchors=(sv.Position.BOTTOM_CENTER,),
+    )
+    for line in LINES
+]
 box_annotator = sv.BoxAnnotator(thickness=1)
 label_annotator = sv.LabelAnnotator(text_scale=0.4, text_thickness=1, text_padding=2)
 trace_annotator = sv.TraceAnnotator(trace_length=30, thickness=2)
@@ -698,20 +709,22 @@ while raw_frame_index < max_raw_frames:
     )[0]
     detections = sv.Detections.from_ultralytics(result)
     detections = tracker.update_with_detections(detections)
-    crossed_in, crossed_out = line_zone.trigger(detections)
 
-    for detection_index in np.flatnonzero(crossed_in | crossed_out):
-        class_id = int(detections.class_id[detection_index])
-        events.append(
-            {
-                "frame": raw_frame_index,
-                "seconds": raw_frame_index / SOURCE_FPS,
-                "track_id": int(detections.tracker_id[detection_index]),
-                "class_id": class_id,
-                "class_name": MODEL_CLASS_NAMES[class_id],
-                "direction": "in" if crossed_in[detection_index] else "out",
-            }
-        )
+    for line_number, line_zone in enumerate(line_zones, start=1):
+        crossed_in, crossed_out = line_zone.trigger(detections)
+        for detection_index in np.flatnonzero(crossed_in | crossed_out):
+            class_id = int(detections.class_id[detection_index])
+            events.append(
+                {
+                    "frame": raw_frame_index,
+                    "seconds": raw_frame_index / SOURCE_FPS,
+                    "line": line_number,
+                    "track_id": int(detections.tracker_id[detection_index]),
+                    "class_id": class_id,
+                    "class_name": MODEL_CLASS_NAMES[class_id],
+                    "direction": "in" if crossed_in[detection_index] else "out",
+                }
+            )
 
     labels = []
     if detections.tracker_id is not None:
@@ -727,7 +740,8 @@ while raw_frame_index < max_raw_frames:
     annotated = label_annotator.annotate(
         scene=annotated, detections=detections, labels=labels
     )
-    annotated = line_annotator.annotate(frame=annotated, line_counter=line_zone)
+    for line_zone in line_zones:
+        annotated = line_annotator.annotate(frame=annotated, line_counter=line_zone)
     writer.write(annotated)
 
     processed_frames += 1
@@ -747,7 +761,7 @@ subprocess.run(
     check=True,
 )
 
-event_columns = ["frame", "seconds", "track_id", "class_id", "class_name", "direction"]
+event_columns = ["frame", "seconds", "line", "track_id", "class_id", "class_name", "direction"]
 events_df = pd.DataFrame(events, columns=event_columns)
 events_df.to_csv(EVENTS_CSV, index=False)
 
@@ -764,7 +778,7 @@ if events_df.empty:
     print("No crossings were recorded. Check the line position, confidence, and detections.")
 else:
     crossing_summary = (
-        events_df.groupby(["class_name", "direction"])
+        events_df.groupby(["line", "class_name", "direction"])
         .size()
         .rename("crossings")
         .to_frame()
