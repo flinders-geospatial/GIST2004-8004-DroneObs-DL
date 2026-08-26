@@ -6,9 +6,10 @@ deep-learning background and is designed for live narration.
 ## Course assets
 
 Host these four files at one public web location (the class S3 bucket) so that
-`<base URL>/<file name>` resolves for each. Students paste the base URL into
-the notebook's single link field. Make the bucket or prefix public for the lab
-day and delete it afterwards.
+`<base URL>/<file name>` resolves for each. The notebook's link field is
+pre-filled with the current base URL; when the bucket changes, update
+`COURSE_DATA_URL` in `build_colab_notebook.py` and regenerate. Make the bucket
+or prefix public for the lab day and delete it afterwards.
 
 | File | Approximate size | Purpose |
 |---|---:|---|

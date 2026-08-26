@@ -49,7 +49,6 @@ The footage is low-altitude oblique drone video: the drone hovers at roughly 50 
 
 1. Open this notebook in Google Colab and choose **File → Save a copy in Drive**.
 2. Choose **Runtime → Change runtime type → GPU**. A T4 is sufficient when one is available.
-3. Have the course link supplied in class ready to paste below.
 
 Colab runtimes reset without warning. The notebook saves training and video outputs to your Drive.
 """
@@ -120,14 +119,14 @@ if not torch.cuda.is_available():
         r"""
 ## 2. Fetch the course files
 
-Paste the course link supplied in class. The four course files download once to this Colab runtime. Your own outputs are saved to your Google Drive, which Colab will ask permission to connect.
+The course link is already filled in below. The four course files download once to this Colab runtime. Your own outputs are saved to your Google Drive, which Colab will ask permission to connect.
 """
     ),
     code(
         r"""
 drive.mount("/content/drive")
 
-COURSE_DATA_URL = ""  # @param {type:"string"}
+COURSE_DATA_URL = "https://gist2004-droneobs-2026.s3.ap-southeast-2.amazonaws.com"  # @param {type:"string"}
 
 OUTPUT_FOLDER = Path("/content/drive/MyDrive/GIST2004-8004/my-droneobs-results")
 OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
