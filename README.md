@@ -5,6 +5,6 @@
 The notebook introduces object detection, tracking and line counting on
 low-altitude oblique drone video. It assumes no deep-learning experience.
 
-Course assets are distributed separately by web link; they are not in the
-GitHub repository. See
-[`COLAB_SETUP.md`](COLAB_SETUP.md) for the asset list and class-day checklist.
+The course files are handed out by web link and are not in this repository.
+See [`COLAB_SETUP.md`](COLAB_SETUP.md) for the file list and class-day
+checklist.

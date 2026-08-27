@@ -6,9 +6,9 @@ notebook JSON.
 
 ## Course files
 
-Host these four files at one public web location so that
-`<base URL>/<file name>` resolves for each. The notebook link field is
-pre-filled with the current bucket URL. When the bucket changes, update
+Host these four files somewhere public so `<base URL>/<file name>` works
+for each one. The notebook link field is pre-filled with the current bucket
+URL. When the bucket changes, update
 `COURSE_DATA_URL` in the builder and regenerate. The bucket is public for the
 lab day only; delete it afterwards.
 
@@ -34,8 +34,8 @@ The archive contains 2,100 VisDrone images and 73,869 labelled boxes:
 
 38 images have valid empty label files. These are background examples.
 
-Before sharing the archive more widely, check the intended arrangement
-against the VisDrone terms and keep the provenance note.
+Before sharing the archive more widely, check it against the VisDrone terms
+and keep the provenance note.
 
 ## Models
 
@@ -44,7 +44,7 @@ The notebook uses plain names: the student's run is `my model`,
 `bigger model`. Every dropdown defaults to `my model`.
 
 The backup is YOLO11n, 50 epochs at 1024 px on this dataset: mAP50 0.449,
-mAP50–95 0.245 on the pilot test set. Student runs start from `yolo26n.pt`.
+mAP50-95 0.245 on the pilot test set. Student runs start from `yolo26n.pt`.
 
 The bigger model is YOLO11s at 960 px from the old multi-source pipeline:
 mAP50 0.852 on its own test set, which used a two-class vehicle/person
@@ -56,8 +56,8 @@ so they are not comparable. The notebook uses only its `vehicle` class. The
 
 `epochs` 20, `imgsz` 960, `batch` 12. Batch 8 peaked at about 7 GB on the
 Colab T4. A local run of the notebook at batch 16 peaked at 13.7 GB reserved,
-too close to the T4's 15 GB for class use, so 12 ships. If a run still hits
-an out-of-memory error, drop back to 8.
+too close to the T4's 15 GB for class use, so the notebook uses 12. If a run
+still hits an out-of-memory error, drop back to 8.
 
 Training runs on `/content` and copies `best.pt` and the plots to Drive when
 it finishes. Do not train against files mounted from Drive. Colab's free GPU
@@ -68,7 +68,7 @@ type and availability vary, so do not promise a completion time.
 The notebook lives in the public
 `flinders-geospatial/GIST2004-8004-DroneObs-DL` repository with an
 **Open in Colab** badge in the README. The four large files stay in S3, out
-of the repository. No AWS credentials appear anywhere in the notebook.
+of the repository. There are no AWS credentials in the notebook.
 
 ## Class sequence
 
@@ -87,8 +87,9 @@ of the repository. No AWS credentials appear anywhere in the notebook.
    column.
 7. Download the annotated video and compare the CSV with a manual count.
 
-Line counts assume a stationary or stabilised camera. A pan or translation
-makes a road-fixed line invalid; the notebook says so.
+Line counts assume a stationary or stabilised camera. If the camera pans or
+drifts, the line no longer sits over the same stretch of road; the notebook
+warns students about this.
 
 ## Next week's footage
 
@@ -101,9 +102,9 @@ rehearsing.
 ## PolygonZone
 
 PolygonZone picks the counting-line coordinates. It does not label training
-data. If a later version adds labelling of new frames, split video-derived
-data by whole clip or time block: near-identical adjacent frames in both
-train and test give inflated validation results.
+data. If students label their own frames in a future version, split the data
+by whole clip or time block: near-identical adjacent frames in both train
+and test inflate the validation results.
 
 ## Rehearsal checklist
 
@@ -124,9 +125,9 @@ train and test give inflated validation results.
   `LINES`, and the numbered lines preview.
 - The final annotated frame renders with cumulative counts, and the
   annotated MP4 and crossing CSV, with its `line` column, copy to Drive.
-  Videos are never base64-embedded in outputs; large embeds make Colab's
-  output frames unresponsive.
-- Reverse a line's endpoints if its in/out convention is unhelpful.
+  Videos are never embedded in cell outputs; large embeds make the page
+  unresponsive.
+- Swap a line's endpoints if in and out come out the wrong way round.
 
 ## Version note
 
