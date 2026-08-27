@@ -164,7 +164,8 @@ This is the video you will process later. Watch it once before any modelling and
     ),
     code(
         r"""
-display(Video(str(VIDEO_SOURCE), embed=True, width=960))
+# Streams from the course link; the downloaded copy is used for processing.
+display(Video(f"{COURSE_DATA_URL.rstrip('/')}/{VIDEO_SOURCE.name}", width=960))
 """
     ),
     md(
@@ -786,12 +787,14 @@ else:
     display(crossing_summary)
     display(events_df.head(10))
 
-video_mb = OUTPUT_MP4.stat().st_size / 1024**2
-if video_mb <= 25:
-    display(Video(str(OUTPUT_MP4), embed=True, width=960))
-else:
-    print(f"The annotated video is {video_mb:.0f} MB, too large to embed in the notebook.")
-    print("Play the copy in your Drive output folder, or use the download cell below.")
+plt.figure(figsize=(14, 8))
+plt.imshow(cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB))
+plt.title("Final annotated frame (each line shows its cumulative in/out counts)")
+plt.axis("off")
+plt.show()
+
+print(f"The annotated video is {OUTPUT_MP4.stat().st_size / 1024**2:.0f} MB.")
+print("Play the copy in your Drive output folder, or use the download cell below.")
 """
     ),
     md(

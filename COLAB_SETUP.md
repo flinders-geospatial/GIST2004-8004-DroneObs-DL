@@ -108,7 +108,9 @@ train and test give inflated validation results.
 ## Rehearsal checklist
 
 - The public base URL resolves for all four file names.
-- The teaching clip embeds and plays after the fetch cell.
+- The teaching clip streams and plays after the fetch cell. It streams from
+  the bucket URL, so this player stops working once the bucket is deleted;
+  processing uses the downloaded copy and is unaffected.
 - The dataset audit reports 1,500/300/300 images.
 - The six random label examples look right.
 - The stock model cell renders detections on the default photo; paste a
@@ -120,8 +122,10 @@ train and test give inflated validation results.
 - The stacked comparison and its parameter table render.
 - `zone_reference.jpg` downloads, PolygonZone's NumPy output pastes over
   `LINES`, and the numbered lines preview.
-- The annotated MP4 plays inline and the crossing CSV, with its `line`
-  column, copies to Drive.
+- The final annotated frame renders with cumulative counts, and the
+  annotated MP4 and crossing CSV, with its `line` column, copy to Drive.
+  Videos are never base64-embedded in outputs; large embeds make Colab's
+  output frames unresponsive.
 - Reverse a line's endpoints if its in/out convention is unhelpful.
 
 ## Version note
