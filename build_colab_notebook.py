@@ -77,7 +77,7 @@ import subprocess
 from collections import Counter
 from pathlib import Path
 from urllib.parse import urlparse
-from urllib.request import urlretrieve
+from urllib.request import Request, urlopen, urlretrieve
 from zipfile import ZipFile
 
 import cv2
@@ -288,7 +288,7 @@ plt.show()
 
 Training a detector from nothing needs millions of labelled images. Instead we start from `yolo26n.pt`, a small pretrained model from [Ultralytics](https://docs.ultralytics.com/models/). It has already been trained on COCO, a large collection of everyday photos covering 80 common object types, so it already knows a great deal about edges, textures, vehicles and people. Adjusting a pretrained model with a much smaller set of our own examples is called transfer learning.
 
-First, try it exactly as downloaded. The address below points to a classic photo used to test detectors. Run the cell, then paste any other image address from the web into the field and run it again.
+First, try it exactly as downloaded. The address below points to a classic photo used to test detectors. Run the cell, then try your own: right-click any picture on the web, choose **Copy image address**, paste it into the field and run the cell again.
 """
     ),
     code(
@@ -297,7 +297,16 @@ stock_model = YOLO("yolo26n.pt")  # downloads the pretrained COCO weights once
 
 IMAGE_URL = "https://ultralytics.com/images/bus.jpg"  # @param {type:"string"}
 
-stock_result = stock_model.predict(IMAGE_URL, imgsz=960, conf=0.25, device=DEVICE, verbose=False)[0]
+# Download the image ourselves; a bare web address handed to the model can be
+# mistaken for a live camera stream, which floods the notebook with warnings.
+image_request = Request(IMAGE_URL, headers={"User-Agent": "Mozilla/5.0"})
+image_bytes = np.frombuffer(urlopen(image_request, timeout=30).read(), dtype=np.uint8)
+stock_image = cv2.imdecode(image_bytes, cv2.IMREAD_COLOR)
+assert stock_image is not None, (
+    "That address did not return an image. Right-click the picture itself and choose 'Copy image address'."
+)
+
+stock_result = stock_model.predict(stock_image, imgsz=960, conf=0.25, device=DEVICE, verbose=False)[0]
 
 plt.figure(figsize=(10, 10))
 plt.imshow(cv2.cvtColor(stock_result.plot(line_width=2), cv2.COLOR_BGR2RGB))

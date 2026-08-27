@@ -128,6 +128,29 @@ train and test give inflated validation results.
   output frames unresponsive.
 - Reverse a line's endpoints if its in/out convention is unhelpful.
 
+## Stream-warning floods
+
+Ultralytics treats a web address without an image suffix as an IP camera.
+Google Images "Copy image address" links are the common case. Before the
+2026-08-27 fix, pasting one into the stock-model cell started a background
+reader that floods every later cell, including a running training cell, with
+"Video stream unresponsive" and timeout warnings. The notebook now downloads
+the image itself, so this cannot recur.
+
+A session flooded by the old version does not need a restart; training is
+unaffected. Add a cell with the code below, run it once the current cell
+finishes (queued cells wait their turn), then clear the noisy outputs:
+
+```python
+import gc
+from ultralytics.data.loaders import LoadStreams
+
+for obj in gc.get_objects():
+    if isinstance(obj, LoadStreams):
+        obj.close()
+print("stray stream readers closed")
+```
+
 ## Version note
 
 `supervision` 0.27 `LineZone.trigger` calls `np.cross` on 2-D vectors, which
