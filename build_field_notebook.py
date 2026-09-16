@@ -563,6 +563,60 @@ Compare the model's count for one line and direction with your hand count. Match
 [Ultralytics predict](https://docs.ultralytics.com/modes/predict/) · [Ultralytics tracking](https://docs.ultralytics.com/modes/track/) · [Ultralytics performance metrics](https://docs.ultralytics.com/guides/yolo-performance-metrics/) · [Supervision line zones](https://supervision.roboflow.com/latest/detection/tools/line_zone/) · [ByteTrack paper](https://arxiv.org/abs/2110.06864) · [VisDrone](https://github.com/VisDrone/VisDrone-Dataset) · [pNEUMA drone trajectories](https://open-traffic.epfl.ch/) · [highD drone trajectories](https://levelxdata.com/highd-dataset/) · [Roboflow PolygonZone](https://polygonzone.roboflow.com/)
 """
     ),
+    md(
+        r"""
+## Photogrammetry scratch
+
+Pix4D and the other photogrammetry packages start from the metadata inside each photo. A drone JPEG carries two blocks in its header. EXIF is written by the camera: lens, exposure, image size and the GPS position in degrees, minutes and seconds. XMP is written by the flight controller under a `drone-dji` namespace: decimal position, absolute and relative altitude, gimbal and aircraft angles, and on an RTK aircraft the fix quality and the calibrated camera model.
+
+Run the cell and choose one or two photos from the photogrammetry set when the file chooser appears. The XMP block is plain text, so the same fields turn up if you open the photo in a text editor and search for `drone-dji`.
+"""
+    ),
+    code(
+        r"""
+import re
+from PIL import ExifTags
+from PIL import Image as PilImage
+
+def read_exif(path):
+    exif = PilImage.open(path).getexif()
+    main = {ExifTags.TAGS.get(k, k): v for k, v in exif.items()}
+    main.update({ExifTags.TAGS.get(k, k): v for k, v in exif.get_ifd(ExifTags.IFD.Exif).items()})
+    gps = {ExifTags.GPSTAGS.get(k, k): v for k, v in exif.get_ifd(ExifTags.IFD.GPSInfo).items()}
+    return main, gps
+
+def read_xmp(path):
+    raw = Path(path).read_bytes()
+    start, end = raw.find(b"<x:xmpmeta"), raw.find(b"</x:xmpmeta>")
+    if start < 0 or end < 0:
+        return {}
+    xmp = raw[start:end].decode("utf-8", "replace")
+    return dict(re.findall(r'drone-dji:(\w+)="([^"]*)"', xmp))
+
+EXIF_KEYS = [
+    "Make", "Model", "DateTimeOriginal", "ExifImageWidth", "ExifImageHeight",
+    "FocalLength", "FocalLengthIn35mmFilm", "FNumber", "ExposureTime", "ISOSpeedRatings",
+    "GPSLatitudeRef", "GPSLatitude", "GPSLongitudeRef", "GPSLongitude", "GPSAltitudeRef", "GPSAltitude",
+]
+
+uploaded = files.upload()
+if not uploaded:
+    print("No photos chosen. Run the cell again and pick one or two JPEGs.")
+for name, data in uploaded.items():
+    photo_path = WORK_ROOT / Path(name).name
+    photo_path.write_bytes(data)
+    main, gps = read_exif(photo_path)
+    print(f"\n=== {photo_path.name} ===")
+    print("EXIF, written by the camera:")
+    for key in EXIF_KEYS:
+        value = main.get(key, gps.get(key))
+        if value is not None:
+            print(f"  {key:24s} {value}")
+    print("XMP, written by the flight controller:")
+    for key, value in read_xmp(photo_path).items():
+        print(f"  {key:24s} {value}")
+"""
+    ),
 ]
 
 
