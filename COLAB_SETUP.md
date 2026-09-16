@@ -109,6 +109,10 @@ choose the backup or bigger model, paste a class clip link, draw lines in
 PolygonZone, and run the same detect, track and count loop. Outputs go to the
 same Drive folder as before.
 
+The last cell, "Photogrammetry scratch", is a lead-in to the photogrammetry
+session: students upload a photo or two and the cell prints the EXIF and
+DJI XMP fields that Pix4D reads. It needs no extra packages.
+
 The notebook fetches `reference_model.pt` and `strong_vehicle_model.pt` from
 the course link, so the bucket has to stay up for this lab as well. The clip
 field opens with the teaching clip, which is how I rehearse before the class
