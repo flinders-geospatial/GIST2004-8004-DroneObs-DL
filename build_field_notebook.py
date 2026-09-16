@@ -263,7 +263,7 @@ Placing a line:
 - Prefer the near side of the frame, where vehicles are larger and tracks are steadier.
 - A vehicle is counted when the bottom centre of its box crosses the line, because in an oblique view that point is close to where the vehicle meets the road.
 
-A fixed line only works while the camera holds still. The gimbal corrects the drone's tilt and yaw, not its slow drift in position while hovering. The `LINES` cell draws your lines on the first frame and on a frame near the end of the clip; if the road has moved under a line, some crossings will be false. Traffic studies that track vehicles for minutes stabilise or georeference the video first, as in the [pNEUMA](https://open-traffic.epfl.ch/) and [highD](https://levelxdata.com/highd-dataset/) datasets.
+A fixed line only works while the camera holds still. The drone hovered in place for each clip and the view holds steady, apart from a couple of bumps of turbulence, one of them caused by a bird. The `LINES` cell draws your lines on the first frame and on a frame near the end of the clip, so you can see whether the road moved under them. Studies that track vehicles for minutes, such as [pNEUMA](https://open-traffic.epfl.ch/) and [highD](https://levelxdata.com/highd-dataset/), georeference the video first.
 """
     ),
     code(
@@ -541,13 +541,9 @@ else:
         r"""
 ### Audit the count
 
-Compare the model's count for one line and direction with your hand count. Matching totals can hide errors that cancel, such as two missed vehicles and two false crossings, so check the events:
+Compare the model's count for one line and direction with your hand count. Matching totals can hide errors that cancel, so look at the video and the CSV as well:
 
-- Which vehicles were missed, and where in the frame were they? Far side or near side, in shadow or in sun?
-- Which false detections appeared? Road markings, bins and parked cars are common ones.
-- Did any track ID switch from one vehicle to another?
-- Did a box jitter across a line more than once?
-- Did the camera hold still? Look at the first and last frame preview in section 4.
+- Which false detections appeared? In our runs the model boxed roadworks machinery, parked vehicles and a wheelie bin.
 - Does `bigger model` give a different count? Choose it in section 2 and rerun from there.
 - What changes when `CONFIDENCE` is 0.25 or 0.75? A lower threshold finds more vehicles and more false detections; the [performance metrics](https://docs.ultralytics.com/guides/yolo-performance-metrics/) guide explains how precision and recall trade off against each other.
 """
@@ -557,7 +553,6 @@ Compare the model's count for one line and direction with your hand count. Match
 ## 6. Where to from here
 
 - Fine-tune on this footage. Label a few dozen frames in [Roboflow Annotate](https://roboflow.com/annotate) and train as in the first practical. Test on frames from the other intersection, otherwise near-identical adjacent frames end up in both train and test.
-- Remove the camera motion. Longer counts need the video stabilised, or each frame registered to a reference frame. Georeferencing then turns pixel tracks into ground positions and speeds.
 - Swap the parts. The detector, tracker and line counter are separate. [Supervision](https://supervision.roboflow.com/latest/) has other trackers, anchor points and polygon zones that use the same detections.
 """
     ),
@@ -565,7 +560,7 @@ Compare the model's count for one line and direction with your hand count. Match
         r"""
 ## References
 
-[Ultralytics predict](https://docs.ultralytics.com/modes/predict/) · [Ultralytics tracking](https://docs.ultralytics.com/modes/track/) · [Ultralytics performance metrics](https://docs.ultralytics.com/guides/yolo-performance-metrics/) · [Supervision line zones](https://supervision.roboflow.com/latest/detection/tools/line_zone/) · [ByteTrack paper](https://arxiv.org/abs/2110.06864) · [VisDrone](https://github.com/VisDrone/VisDrone-Dataset) · [Roboflow PolygonZone](https://polygonzone.roboflow.com/)
+[Ultralytics predict](https://docs.ultralytics.com/modes/predict/) · [Ultralytics tracking](https://docs.ultralytics.com/modes/track/) · [Ultralytics performance metrics](https://docs.ultralytics.com/guides/yolo-performance-metrics/) · [Supervision line zones](https://supervision.roboflow.com/latest/detection/tools/line_zone/) · [ByteTrack paper](https://arxiv.org/abs/2110.06864) · [VisDrone](https://github.com/VisDrone/VisDrone-Dataset) · [pNEUMA drone trajectories](https://open-traffic.epfl.ch/) · [highD drone trajectories](https://levelxdata.com/highd-dataset/) · [Roboflow PolygonZone](https://polygonzone.roboflow.com/)
 """
     ),
 ]
