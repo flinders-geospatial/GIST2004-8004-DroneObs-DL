@@ -569,14 +569,21 @@ Compare the model's count for one line and direction with your hand count. Match
 
 Pix4D and the other photogrammetry packages start from the metadata inside each photo. A drone JPEG carries two blocks in its header. EXIF is written by the camera: lens, exposure, image size and the GPS position in degrees, minutes and seconds. XMP is written by the flight controller under a `drone-dji` namespace: decimal position, absolute and relative altitude, gimbal and aircraft angles, and on an RTK aircraft the fix quality and the calibrated camera model.
 
-Run the cell and choose one or two photos from the photogrammetry set when the file chooser appears. The XMP block is plain text, so the same fields turn up if you open the photo in a text editor and search for `drone-dji`.
+This section stands on its own: it needs no GPU and none of the cells above. Run the cell and choose one or two photos from the photogrammetry set when the file chooser appears. The XMP block is plain text, so the same fields turn up if you open the photo in a text editor and search for `drone-dji`.
 """
     ),
     code(
         r"""
 import re
+from pathlib import Path
+
 from PIL import ExifTags
 from PIL import Image as PilImage
+
+from google.colab import files
+
+PHOTO_FOLDER = Path("/content/photo_scratch")
+PHOTO_FOLDER.mkdir(parents=True, exist_ok=True)
 
 def read_exif(path):
     exif = PilImage.open(path).getexif()
@@ -603,7 +610,7 @@ uploaded = files.upload()
 if not uploaded:
     print("No photos chosen. Run the cell again and pick one or two JPEGs.")
 for name, data in uploaded.items():
-    photo_path = WORK_ROOT / Path(name).name
+    photo_path = PHOTO_FOLDER / Path(name).name
     photo_path.write_bytes(data)
     main, gps = read_exif(photo_path)
     print(f"\n=== {photo_path.name} ===")
